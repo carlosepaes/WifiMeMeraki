@@ -1,0 +1,89 @@
+Acesso aos servidores
+Para acesso  remoto aos servidores da Amazon (portal e stage), Digital Ocean (analytics) e Shopping Higienopolis (controller e proxy) eu criei um usuário chamado "wladimir" com senha "wladimir". 
+
+Como não recebi as chaves SSH eu mesmo criei um par de chaves para este usuário (arquivos em anexo wladimir_rsa e wladimir_rsa.pub).
+
+Os servidores da Amazon/Digital Ocean são:
+
+- portal.wifime.com.br (produção/amazon)
+- stage.wifime.com.br  (stage/amazon)
+- analytics.wifime.com.br (produção/digital ocean)
+
+para acessar os mesmos remotamente usando as chaves acima é preciso primeiro liberar o IP da máquina de origem na Amazon (security group sec-wifime-sysadmin ou sec-stage-ssh) e depois executar o comando ssh. Exemplo: "ssh -i ./wladimir_rsa wladimir@stage.wifime.com.br".
+
+No caso do shopping o único servidor exposto na internet é o "proxy". O controller (onde roda o coova) fica "atrás" dele (conforme topologia no github infra). Assim para acessar o controller no shopping remotamente basta fazer um ssh no proxy e a partir dele fazer outro ssh para o controller.
+
+O proxy possui os seguintes IPS:
+
+- 201.85.10.2
+- 200.174.87.18
+- 200.236.217.182
+
+E o controller possui o IP privado
+
+-10.1.1.10
+
+No caso das máquinas do shopping o ssh roda na porta 22000 ao invés da porta default 22. Assim sendo é preciso no comando ssh usar a porta indicada. ex; "ssh -i ./wladimir_rsa -p 22000 wladimir@201.85.10.2"
+
+Acesso aos serviços da Amazon
+
+Para acesso aos serviços da Amazon utilizar a URL http://adlib..signin.aws.amazon.com/console e se autenticar com um dos usuários IAM criados ontem (wladmir e wagner).
+
+ATENÇÃO: Existem na Amazon duas máquinas QUE NÃO TEMOS BACKUP OU ACESSO referentes aos sites da Adlib e do próprio Wifime. NÃO PAREM ESTAS INSTÂNCIAS!!!
+
+Backups da base dados
+
+O servidor de produção roda um script diariamente que efetua backup do banco mysql (diario, semanal e mensal) dentro da pasta mysql_backup no S3 localizado no bucket wifime-backup (wifime-backups.s3-website-sa-east-1.amazonaws.com)
+
+Os arquivos de backup são criptografados com uma chave simétrica aes-256 que está no arquivo keepass em anexo (mysql backup user) e pode ser descriptografado usando openssl. Exemplo:
+
+openssl enc -aes-256-cbc -salt -d -pass file:passkey.txt -in infile.txt.dat -out restore.txt 
+
+NÃO EXISTE BACKUP DO COUNTLY, então cuidado com as operações no mesmo.
+
+Logs de acesso
+
+O servidor controller no shopping executa um script chamdo httpmon que captura o tráfego HTTP em log e diariamente envia o mesmo para o bucket S3 wifime-httpmon (wifime-httpmon.s3-website-sa-east-1.amazonaws.com)
+
+New Relic --- ATENÇÃO!!!!!!!!!!!
+
+NA próxima semana minha conta new relic será cancelada e com isso os alarmes e monitoramento irão morrer. Vocês precisam criar uma conta New Relic (ou outro serviço de monitoramento) para a Wifime e reconfigurar os serviços new relic para que eles utilizem uma licença associada à conta wifime.
+
+Papertrail
+
+Utlizamos o serviço papertrail para logs em tempo real. Disparei um invite para cada um de vocês para que possam ter acessos ao mesmo.
+
+Consulta ao banco de dados
+
+Para consultar o banco de dados em produção remotamente existem duas opções:
+
+1) realizar um túnel SSH com redirecionamento da porta remota 3306 para porta local
+
+2) liberar o IP remoto no security group sec-wifime-database e reconfigurar o mysql para que ele opere em qualquer endereço IP (hoje ele escuta apenas o IP local, por segurança).
+
+Eu utilizo a primeira opção, mas caso vocês trabalhem com ferramentas que não suportem o túnel SSH, com a segunda opção é possível realizar o acesso.
+
+Anexei uma consulta que poderá auxiliar na consulta de usuários por e-mail (CONSULTA_USUARIO_POR_EMAIL.sql).
+
+Conforme explicado, a aplicação trabalha com conceito de "soft delete", ou "delete lógico", ou seja NUNCA APAGAMOS UM CADASTRO DO BANCO e sim marcamos o mesmo como deletado, permitindo que um usuário faça novamente o cadastro, caso queira.
+
+Para isso basta atribuir um date_time (normalmente usando a função NOW() ) para os campos users.deleted_at e credentials.deleted_at.
+
+Tabelas
+
+Ainda conforme explicado em nosso papo as tabelas relacionadas ao serviço freeradius são todas prefixadas por "ras" e também a tabela NAS.
+
+As principais tabelas da aplicação atual são:
+- Users (usuários)
+- Credentials (credenciais para login: wifime ou facebook)
+- Customers
+- Params (parâmetros do portal específicos por cliente, como countly key, imagem de background e header e url de redirect).
+
+user_data e user_data_detail não são utilizadas, sendo legado da versão anterior.
+
+Mindmap (Freemind)
+
+Estou mandando o Mindmap, que também pode ser visto no github de infra. Ele tem anotações e informações desde que iniciei o projeto (algumas até defasadas) Vou dar uma repassada nele e demais documentos lá presentes e aviso vocês quando atualizar algo.
+
+Senhas (Keepas)
+Estou enviando também um arquivo onde eu guardava todas as senhas utilizadas em servidores, serviços e aparelhos. A senha para abrir o arquivo é AdlibDigital!@2014.
